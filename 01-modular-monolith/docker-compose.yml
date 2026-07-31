@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eshop-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-eshop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eshop_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-eshop}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-eshop} -d ${POSTGRES_DB:-eshop}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: eshop-redis
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: eshop-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-eshop}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-eshop_dev_password}
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eshop-api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-eshop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eshop_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-eshop}
+      REDIS_URL: redis://redis:6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-eshop}:${RABBITMQ_PASSWORD:-eshop_dev_password}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_please}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: >
+      sh -c "node ./node_modules/typeorm/cli.js migration:run -d dist/infrastructure/postgres/data-source.js && node dist/main.js"
+
+volumes:
+  postgres_data:

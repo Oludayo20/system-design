@@ -1,0 +1,210 @@
+version: '3.9'
+
+x-app-env: &app-env
+  NODE_ENV: production
+  PORT: 3000
+  JWT_SECRET: ${JWT_SECRET:-change_me_in_production_please}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+  SHARD_COUNT: 3
+  PRIMARY_DB_HOST: postgres-primary
+  PRIMARY_DB_PORT: 5432
+  PRIMARY_DB_USER: ${PRIMARY_DB_USER:-oja}
+  PRIMARY_DB_PASSWORD: ${PRIMARY_DB_PASSWORD:-oja_dev_password}
+  PRIMARY_DB_NAME: ${PRIMARY_DB_NAME:-oja_primary}
+  SHARD0_DB_HOST: postgres-shard-0
+  SHARD0_DB_PORT: 5432
+  SHARD0_DB_USER: ${SHARD_DB_USER:-oja}
+  SHARD0_DB_PASSWORD: ${SHARD_DB_PASSWORD:-oja_dev_password}
+  SHARD0_DB_NAME: ${SHARD0_DB_NAME:-oja_shard0}
+  SHARD1_DB_HOST: postgres-shard-1
+  SHARD1_DB_PORT: 5432
+  SHARD1_DB_USER: ${SHARD_DB_USER:-oja}
+  SHARD1_DB_PASSWORD: ${SHARD_DB_PASSWORD:-oja_dev_password}
+  SHARD1_DB_NAME: ${SHARD1_DB_NAME:-oja_shard1}
+  SHARD2_DB_HOST: postgres-shard-2
+  SHARD2_DB_PORT: 5432
+  SHARD2_DB_USER: ${SHARD_DB_USER:-oja}
+  SHARD2_DB_PASSWORD: ${SHARD_DB_PASSWORD:-oja_dev_password}
+  SHARD2_DB_NAME: ${SHARD2_DB_NAME:-oja_shard2}
+  REDIS_URL: redis://redis:6379
+  RABBITMQ_URL: amqp://${RABBITMQ_USER:-oja}:${RABBITMQ_PASSWORD:-oja_dev_password}@rabbitmq:5672
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: oja-nginx
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api-1:
+        condition: service_healthy
+      api-2:
+        condition: service_healthy
+    restart: unless-stopped
+
+  api-1:
+    build: .
+    container_name: oja-api-1
+    environment:
+      <<: *app-env
+      INSTANCE_ID: api-1
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-shard-0:
+        condition: service_healthy
+      postgres-shard-1:
+        condition: service_healthy
+      postgres-shard-2:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  api-2:
+    build: .
+    container_name: oja-api-2
+    environment:
+      <<: *app-env
+      INSTANCE_ID: api-2
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      postgres-shard-0:
+        condition: service_healthy
+      postgres-shard-1:
+        condition: service_healthy
+      postgres-shard-2:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  # --- Primary: Marketplace / Orders / Notifications + email->shard directory ---
+  postgres-primary:
+    image: postgres:16-alpine
+    container_name: oja-postgres-primary
+    environment:
+      POSTGRES_USER: ${PRIMARY_DB_USER:-oja}
+      POSTGRES_PASSWORD: ${PRIMARY_DB_PASSWORD:-oja_dev_password}
+      POSTGRES_DB: ${PRIMARY_DB_NAME:-oja_primary}
+    ports:
+      - '5432:5432'
+    volumes:
+      - oja_postgres_primary_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # --- Shards: Users + Wallets, sharded by hash(userId) % 3 ---
+  postgres-shard-0:
+    image: postgres:16-alpine
+    container_name: oja-postgres-shard-0
+    environment:
+      POSTGRES_USER: ${SHARD_DB_USER:-oja}
+      POSTGRES_PASSWORD: ${SHARD_DB_PASSWORD:-oja_dev_password}
+      POSTGRES_DB: ${SHARD0_DB_NAME:-oja_shard0}
+    ports:
+      - '5433:5432'
+    volumes:
+      - oja_postgres_shard0_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  postgres-shard-1:
+    image: postgres:16-alpine
+    container_name: oja-postgres-shard-1
+    environment:
+      POSTGRES_USER: ${SHARD_DB_USER:-oja}
+      POSTGRES_PASSWORD: ${SHARD_DB_PASSWORD:-oja_dev_password}
+      POSTGRES_DB: ${SHARD1_DB_NAME:-oja_shard1}
+    ports:
+      - '5434:5432'
+    volumes:
+      - oja_postgres_shard1_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  postgres-shard-2:
+    image: postgres:16-alpine
+    container_name: oja-postgres-shard-2
+    environment:
+      POSTGRES_USER: ${SHARD_DB_USER:-oja}
+      POSTGRES_PASSWORD: ${SHARD_DB_PASSWORD:-oja_dev_password}
+      POSTGRES_DB: ${SHARD2_DB_NAME:-oja_shard2}
+    ports:
+      - '5435:5432'
+    volumes:
+      - oja_postgres_shard2_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # --- Cache & sessions ---
+  redis:
+    image: redis:7-alpine
+    container_name: oja-redis
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # --- Internal event bus: order.created -> Email/Inventory/Analytics/Wallet workers ---
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: oja-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-oja}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-oja_dev_password}
+    ports:
+      - '5672:5672'
+      - '15672:15672' # management UI
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  oja_postgres_primary_data:
+  oja_postgres_shard0_data:
+  oja_postgres_shard1_data:
+  oja_postgres_shard2_data:

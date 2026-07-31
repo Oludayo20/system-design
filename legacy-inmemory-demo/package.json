@@ -1,0 +1,14 @@
+{
+  "name": "system-design-demo",
+  "version": "1.0.0",
+  "description": "Runnable demo of the concepts in doc.md: modular monoliths, event-driven communication (RabbitMQ/Kafka style), Redis caching, and database sharding.",
+  "type": "module",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "demo": "node scripts/demo.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

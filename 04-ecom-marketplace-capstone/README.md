@@ -307,3 +307,27 @@ the Postgres/Redis/RabbitMQ containers, Nginx round-robin behavior, and the full
 register → login → order → worker-settlement flow against real infra were **not**
 integration-tested. `npm install`, `npm run build`, `npm run lint`, and `npm test` all pass
 cleanly. Everything above is written to be run as-is once Docker Desktop is available.
+
+## Levels 6 & 7 — What comes after this capstone
+
+Projects **01–04** get you to a production-shaped architecture: modular monolith, sharding,
+async workers, and horizontal scaling. The last two levels are about **behavior when things fail**:
+
+| Level | Concept | Where to learn it | Already in this capstone |
+|---|---|---|---|
+| 6 | **Resilience** — retries, circuit breakers, fallbacks, graceful degradation | [`05-resilience`](../05-resilience) | Nginx + 2 API replicas; RabbitMQ retry/DLQ from project 03 |
+| 7 | **CAP theorem** — AP vs CP tradeoffs during network partitions | [`06-cap-theorem`](../06-cap-theorem) | Wallets on shards (CP); product cache reads (more AP-friendly) |
+
+Full write-up: [`LEVELS-6-7.md`](../LEVELS-6-7.md)
+
+**Oja-specific CAP choices in this capstone:**
+
+- **Wallet balance (CP):** debits go through `ShardRouterService` to the correct shard; insufficient funds rejected before any event is published.
+- **Product list cache (AP-friendly):** Redis cache-aside on `GET /marketplace/products` — slightly stale catalog data is acceptable.
+- **Order workers (eventual):** inventory/email/analytics settle asynchronously after the HTTP response returns.
+
+**Resilience gaps to add in production (see project 05):**
+
+- Circuit breakers around external payment providers (Paystack/Flutterwave)
+- Application-level retry with backoff before falling back to a second provider
+- Health-check-driven load balancer draining of unhealthy replicas

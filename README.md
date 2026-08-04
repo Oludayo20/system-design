@@ -1,10 +1,10 @@
 # System Design — from doc.md to running code
 
-`doc.md` is a chat transcript covering three system design concepts. This repo turns each one
-into a real, runnable project, then combines all three into a capstone. Every project uses
-PostgreSQL in Docker and the same tools the doc names for production use (RabbitMQ, Redis,
-Kafka, Nginx), built with NestJS/TypeScript and TypeORM the way an engineering team would
-actually ship it.
+`doc.md` is a chat transcript covering system design concepts from modular monoliths through
+internet-scale resilience and CAP tradeoffs. This repo turns each one into a real, runnable
+project, then combines the first three into a capstone. Every project uses PostgreSQL in Docker
+and the same tools the doc names for production use (RabbitMQ, Redis, Kafka, Nginx), built with
+NestJS/TypeScript and TypeORM the way an engineering team would actually ship it.
 
 | # | Project | Concept in doc.md | Stack |
 |---|---------|--------------------|-------|
@@ -12,6 +12,10 @@ actually ship it.
 | 2 | [`02-database-sharding`](./02-database-sharding) | Sharding a database by key (range / hash / geo), shard routing, sharding vs replication | NestJS, 3× PostgreSQL shards, Docker Compose |
 | 3 | [`03-async-queue-processing`](./03-async-queue-processing) | Producer/queue/consumer, RabbitMQ vs Kafka, retries & dead-letter queues, traffic-spike absorption | NestJS, PostgreSQL, RabbitMQ, Kafka, Docker Compose |
 | 4 | [`04-oja-marketplace-capstone`](./04-oja-marketplace-capstone) | Everything above combined into the "Oja/Skoo" architecture from the end of doc.md | NestJS (modular monolith), Nginx load balancer, 2 API replicas, sharded Postgres, Redis, RabbitMQ workers, Docker Compose |
+| 5 | [`05-resilience`](./05-resilience) | **Level 6:** retries, circuit breakers, provider fallback, graceful degradation | NestJS (in-memory flaky payment demo) |
+| 6 | [`06-cap-theorem`](./06-cap-theorem) | **Level 7:** CAP tradeoffs — AP product views vs CP wallet debits, partition simulation | NestJS (in-memory two-node cluster) |
+
+See [`LEVELS-6-7.md`](./LEVELS-6-7.md) for the full concept write-up on resilience and CAP theorem.
 
 ## Why this structure
 

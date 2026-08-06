@@ -229,6 +229,8 @@ scripts/
 
 ## Running it
 
+> **Hosting & deployment:** See [HOSTING.md](./HOSTING.md) for Docker setup, platforms (free → paid), production tooling, and per-component checklists.
+
 Requires Docker (for the three Postgres shards) and Node 20+.
 
 ```bash

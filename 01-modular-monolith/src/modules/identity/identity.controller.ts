@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiConflictResponse, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuthResult, IdentityService } from './identity.service';
@@ -11,12 +12,25 @@ export class IdentityController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Register a new customer account',
+    description:
+      'Creates a user in the identity schema, hashes the password with bcrypt, stores a session in Redis, and returns a JWT access token.',
+  })
+  @ApiResponse({ status: 201, description: 'Account created.', type: AuthResponseDto })
+  @ApiConflictResponse({ description: 'An account with this email already exists.' })
   register(@Body() dto: RegisterDto): Promise<AuthResult> {
     return this.identityService.register(dto);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Log in with email and password',
+    description: 'Validates credentials, refreshes the Redis session, and returns a JWT access token.',
+  })
+  @ApiResponse({ status: 200, description: 'Login successful.', type: AuthResponseDto })
+  @ApiUnauthorizedResponse({ description: 'Invalid email or password.' })
   login(@Body() dto: LoginDto): Promise<AuthResult> {
     return this.identityService.login(dto);
   }

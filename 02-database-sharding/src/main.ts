@@ -17,9 +17,15 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Database Sharding Demo')
     .setDescription(
-      'Reference implementation of a shard router over three independent PostgreSQL databases.',
+      'NestJS API routing user records across three independent PostgreSQL shards. ' +
+        'Switch strategies via `SHARDING_STRATEGY` env var: `hash` (default), `range`, or `geo`.\n\n' +
+        '**Endpoints:**\n' +
+        '- `POST /users` — create (id generated, then routed)\n' +
+        '- `GET /users/:id` — single-shard lookup\n' +
+        '- `GET /users/_debug/distribution` — ops-only fan-out to all shards',
     )
     .setVersion('1.0')
+    .addTag('users', 'Sharded user CRUD and debug distribution')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);

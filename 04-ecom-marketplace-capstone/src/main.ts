@@ -20,9 +20,19 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Oja Marketplace Capstone API')
     .setDescription(
-      'Modular monolith + sharded Postgres (Users/Wallet) + RabbitMQ async workers, behind Nginx with 2 API replicas.',
+      'Full-stack system design capstone: modular monolith + sharded Postgres (Users/Wallet) + ' +
+        'async RabbitMQ workers + Redis cache + horizontal scaling behind Nginx.\n\n' +
+        '**Public routes:** `auth/*`, `marketplace/*`, `health`\n\n' +
+        '**Protected routes:** `users/me`, `wallet/me`, `orders` — register/login first, then **Authorize** with the JWT.\n\n' +
+        '**Background workers** (not HTTP): Email, Inventory, Analytics, Wallet settlement on `order.created`.',
     )
     .setVersion('1.0')
+    .addTag('auth', 'Register and login; writes shard + directory')
+    .addTag('users', 'Sharded user profile — requires JWT')
+    .addTag('marketplace', 'Products and categories on primary DB')
+    .addTag('orders', 'Place orders — requires JWT')
+    .addTag('wallet', 'Balance and ledger on user shard — requires JWT')
+    .addTag('health', 'Load balancer / orchestration health probe')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);

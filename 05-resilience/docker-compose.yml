@@ -1,0 +1,17 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: resilience-api
+    ports:
+      - '3005:3005'
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      PAYMENT_FAILURE_RATE: ${PAYMENT_FAILURE_RATE:-0.7}
+      CIRCUIT_FAILURE_THRESHOLD: ${CIRCUIT_FAILURE_THRESHOLD:-5}
+      CIRCUIT_RESET_MS: ${CIRCUIT_RESET_MS:-10000}
+      MAX_RETRIES: ${MAX_RETRIES:-3}
+      RETRY_DELAY_MS: ${RETRY_DELAY_MS:-200}
+    restart: unless-stopped

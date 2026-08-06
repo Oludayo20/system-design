@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CircuitBreaker } from '../resilience/circuit-breaker';
 import { withRetries } from '../resilience/retry.util';
-import { FlakyPaymentGateway, PaymentResult } from './flaky-payment.gateway';
+import { FlakyPaymentGateway, PaymentResult } from '../payment/flaky-payment.gateway';
 
 @Injectable()
 export class CheckoutService {

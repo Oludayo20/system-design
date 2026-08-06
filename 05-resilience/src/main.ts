@@ -15,8 +15,15 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Resilience Demo')
-    .setDescription('Retries, circuit breakers, provider fallback, and queued payments')
+    .setDescription(
+      'Application-level resilience patterns around a flaky payment provider.\n\n' +
+        '**Endpoints:**\n' +
+        '- `POST /checkout` — retry + circuit breaker + provider fallback\n' +
+        '- `GET /checkout/circuit` — inspect circuit breaker state\n\n' +
+        '**Env tuning:** `PAYMENT_FAILURE_RATE`, `CIRCUIT_FAILURE_THRESHOLD`, `MAX_RETRIES`, `RETRY_DELAY_MS`',
+    )
     .setVersion('1.0')
+    .addTag('checkout', 'Payment checkout with retries, circuit breaker, and fallback')
     .build();
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swaggerConfig));
 

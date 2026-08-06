@@ -1,7 +1,15 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { CreateOrderResponseDto } from './dto/create-order-response.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../../common/jwt-payload.interface';
@@ -15,6 +23,17 @@ export class OrdersController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Place an order',
+    description:
+      '1. Validates stock via MarketplaceService.\n' +
+      '2. Persists Order + OrderItems on **primary** Postgres in a transaction.\n' +
+      '3. Publishes `order.created` to RabbitMQ.\n' +
+      '4. Returns immediately — Email, Inventory, Analytics, and Wallet workers settle asynchronously.',
+  })
+  @ApiResponse({ status: 201, type: CreateOrderResponseDto })
+  @ApiBadRequestResponse({ description: 'Insufficient stock or invalid items.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   create(@CurrentUser() user: JwtPayload, @Body() dto: CreateOrderDto) {
     return this.ordersService.createOrder(user.sub, dto);
   }

@@ -165,6 +165,8 @@ src/
 
 ## Running it
 
+> **Hosting & deployment:** See [HOSTING.md](./HOSTING.md) for Docker setup, platforms (free → paid), production tooling, and per-component checklists.
+
 ### Prerequisites
 
 - Docker + Docker Compose (recommended path), **or** Node 20+, PostgreSQL 16, Redis 7, RabbitMQ 3

@@ -1,0 +1,12 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cap-theorem-api
+    ports:
+      - '3006:3006'
+    environment:
+      NODE_ENV: production
+      PORT: 3006
+    restart: unless-stopped

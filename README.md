@@ -15,6 +15,17 @@ NestJS/TypeScript and TypeORM the way an engineering team would actually ship it
 | 5 | [`05-resilience`](./05-resilience) | **Level 6:** retries, circuit breakers, provider fallback, graceful degradation | NestJS (in-memory flaky payment demo) |
 | 6 | [`06-cap-theorem`](./06-cap-theorem) | **Level 7:** CAP tradeoffs — AP product views vs CP wallet debits, partition simulation | NestJS (in-memory two-node cluster) |
 
+Each project has a **[HOSTING.md](./01-modular-monolith/HOSTING.md)** guide: local Docker setup, platforms (free → paid), per-component tooling, and production checklists.
+
+| Project | Hosting guide |
+|---------|---------------|
+| 01 Modular monolith | [`01-modular-monolith/HOSTING.md`](./01-modular-monolith/HOSTING.md) |
+| 02 Database sharding | [`02-database-sharding/HOSTING.md`](./02-database-sharding/HOSTING.md) |
+| 03 Async queues | [`03-async-queue-processing/HOSTING.md`](./03-async-queue-processing/HOSTING.md) |
+| 04 Oja capstone | [`04-ecom-marketplace-capstone/HOSTING.md`](./04-ecom-marketplace-capstone/HOSTING.md) |
+| 05 Resilience | [`05-resilience/HOSTING.md`](./05-resilience/HOSTING.md) |
+| 06 CAP theorem | [`06-cap-theorem/HOSTING.md`](./06-cap-theorem/HOSTING.md) |
+
 See [`LEVELS-6-7.md`](./LEVELS-6-7.md) for the full concept write-up on resilience and CAP theorem.
 
 ## Why this structure
@@ -41,8 +52,28 @@ npm install
 npm run start:dev         # or: npm run migration:run && npm run start:dev
 ```
 
+Interactive **Swagger API docs** are available at `http://localhost:<port>/docs` once the API is running (ports: 3000 for 01–04, 3005 for 05, 3006 for 06). Every HTTP endpoint is documented with request/response schemas.
+
 See each project's own README for exact endpoints and things to try.
 
 > Note: Docker Desktop is installed on this machine but its CLI wasn't on `PATH` / the daemon
 > wasn't running when these projects were built, so `docker compose up` has not been executed
 > here. Start Docker Desktop first, then run the commands above.
+
+# 01 — E-Shop (Postgres + Redis + RabbitMQ + API)
+cd system-design/01-modular-monolith && cp .env.example .env && docker compose up --build
+
+# 02 — Sharding (3 Postgres shards + API)
+cd system-design/02-database-sharding && cp .env.example .env && docker compose up --build -d
+
+# 03 — Async queues (Postgres + RabbitMQ + Kafka + API + worker)
+cd system-design/03-async-queue-processing && cp .env.example .env && docker compose up --build -d
+
+# 04 — Capstone (Nginx + 2 APIs + 4 Postgres + Redis + RabbitMQ) — needs ~4–6 GB RAM
+cd system-design/04-ecom-marketplace-capstone && cp .env.example .env && docker compose up -d --build
+
+# 05 — Resilience (single API, port 3005)
+cd system-design/05-resilience && cp .env.example .env && docker compose up --build
+
+# 06 — CAP theorem (single API, port 3006)
+cd system-design/06-cap-theorem && cp .env.example .env && docker compose up --build

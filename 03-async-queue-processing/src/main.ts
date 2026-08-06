@@ -13,10 +13,14 @@ async function bootstrap() {
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Async Queue Processing — Reference API')
     .setDescription(
-      'POST /rides persists a ride and publishes ride.completed to RabbitMQ, then returns ' +
-        'immediately. Email, analytics, and loyalty workers process it in a separate process.',
+      'Producer/queue/consumer pattern demonstrated with RabbitMQ.\n\n' +
+        '**This API (producer):** `POST /rides` — the only HTTP endpoint.\n\n' +
+        '**Background workers** (separate process, not in Swagger): Email, Analytics, and Loyalty ' +
+        'consumers on `email.queue`, `analytics.queue`, `loyalty.queue` with retry + dead-letter handling.\n\n' +
+        '**Kafka** (standalone scripts, not HTTP): `npm run kafka:produce` / `kafka:consume:*` for broadcast comparison.',
     )
     .setVersion('1.0')
+    .addTag('rides', 'Ride completion producer — publishes to RabbitMQ')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, document);

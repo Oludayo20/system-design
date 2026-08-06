@@ -185,6 +185,8 @@ src/
 
 ## Running it
 
+> **Hosting & deployment:** See [HOSTING.md](./HOSTING.md) for Docker setup, platforms (free → paid), production tooling, and per-component checklists.
+
 Docker wasn't available in the environment this was built in, so `docker compose up` has not
 been executed here — the steps below are what you'd run once Docker Desktop is up.
 

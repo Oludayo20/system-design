@@ -33,6 +33,8 @@ Two in-memory nodes (`A` and `B`) with a partition toggle:
 
 ## Run it
 
+> **Hosting & deployment:** See [HOSTING.md](./HOSTING.md) for Docker setup, platforms (free → paid), production tooling, and per-component checklists.
+
 ```bash
 cp .env.example .env
 npm install

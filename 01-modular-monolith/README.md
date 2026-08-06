@@ -29,6 +29,41 @@ one module (say, Notifications) ever needs to become its own service because it'
 millions of emails a day, you can cut it out cleanly because its boundary was already a real
 boundary, not just a folder name.
 
+## Documentation
+
+Each doc explains **how that part works at runtime** and **why it was implemented that way** (tradeoffs, alternatives, what to avoid).
+
+**System design diagram (PNG):** [docs/modular-monolith-system-design.png](./docs/modular-monolith-system-design.png)
+
+| Document | What you'll learn |
+|----------|-------------------|
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | End-to-end checkout flow, why events vs sync calls, boundary enforcement |
+| [src/README.md](./src/README.md) | Boot sequence, request vs event flows, folder layout rationale |
+| [src/modules/README.md](./src/modules/README.md) | When modules use sync service calls vs async events |
+| [src/infrastructure/README.md](./src/infrastructure/README.md) | Why Postgres + Redis + RabbitMQ each exist |
+
+**Per-module (how + why):**
+
+| Module | README |
+|--------|--------|
+| Identity (auth) | [src/modules/identity/README.md](./src/modules/identity/README.md) |
+| Catalog | [src/modules/catalog/README.md](./src/modules/catalog/README.md) |
+| Basket (cart) | [src/modules/basket/README.md](./src/modules/basket/README.md) |
+| Ordering (orders) | [src/modules/ordering/README.md](./src/modules/ordering/README.md) |
+| Inventory (consumer) | [src/modules/inventory/README.md](./src/modules/inventory/README.md) |
+| Notifications (consumer) | [src/modules/notifications/README.md](./src/modules/notifications/README.md) |
+
+**Infrastructure (how + why):**
+
+| Component | README |
+|-----------|--------|
+| PostgreSQL & migrations | [src/infrastructure/postgres/README.md](./src/infrastructure/postgres/README.md) |
+| Redis | [src/infrastructure/redis/README.md](./src/infrastructure/redis/README.md) |
+| RabbitMQ & events | [src/infrastructure/rabbitmq/README.md](./src/infrastructure/rabbitmq/README.md) |
+| Shared utilities | [src/shared/README.md](./src/shared/README.md) |
+
+Deployment: [HOSTING.md](./HOSTING.md)
+
 ## Module map (E-Shop naming -> doc.md naming)
 
 The source doc uses `auth` / `cart` / `orders`; this implementation uses the E-Shop names from the

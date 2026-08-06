@@ -1,12 +1,11 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
-  ApiBadRequestResponse,
-  ApiNotFoundResponse,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+  ApiNotFoundError,
+  ApiReadErrors,
+  ApiServerError,
+  ApiValidationErrors,
+} from '../common/swagger/api-error.decorators';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ShardDistributionResponseDto } from './dto/shard-distribution-response.dto';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -25,7 +24,10 @@ export class UsersController {
       'Generates a global Snowflake-style ID first, then routes the record to exactly one shard ' +
       'using the active `SHARDING_STRATEGY` (hash, range, or geo). Only that shard is written.',
   })
+  @ApiBody({ type: CreateUserDto })
   @ApiResponse({ status: 201, description: 'User created on the resolved shard.', type: UserResponseDto })
+  @ApiValidationErrors()
+  @ApiServerError()
   create(@Body() dto: CreateUserDto): Promise<UserResponseDto> {
     return this.usersService.create(dto);
   }
@@ -38,6 +40,7 @@ export class UsersController {
       'hash distribution after seeding. Never call this on the production hot path.',
   })
   @ApiResponse({ status: 200, type: ShardDistributionResponseDto })
+  @ApiReadErrors()
   getDistribution(): Promise<ShardDistributionResponseDto> {
     return this.usersService.getShardDistribution();
   }
@@ -51,10 +54,9 @@ export class UsersController {
   })
   @ApiParam({ name: 'id', description: 'Numeric user ID generated at creation time', example: '1927841923837952' })
   @ApiResponse({ status: 200, description: 'User found on its owning shard.', type: UserResponseDto })
-  @ApiNotFoundResponse({ description: 'User not found on its resolved shard.' })
-  @ApiBadRequestResponse({
-    description: 'Geo strategy: cannot resolve shard from id alone (region was the shard key at write time).',
-  })
+  @ApiValidationErrors()
+  @ApiNotFoundError('User not found on its resolved shard.')
+  @ApiServerError()
   findById(@Param('id') id: string): Promise<UserResponseDto> {
     return this.usersService.findById(id);
   }

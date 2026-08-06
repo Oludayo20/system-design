@@ -1,5 +1,13 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiExtraModels,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  getSchemaPath,
+} from '@nestjs/swagger';
+import { ApiServerError, ApiValidationErrors } from '../common/swagger/api-error.decorators';
 import { ClusterService } from '../cluster/cluster.service';
 import { DebitDto } from './dto/debit.dto';
 import { PartitionDto } from './dto/partition.dto';
@@ -13,6 +21,7 @@ import {
 } from './dto/cap-response.dto';
 
 @ApiTags('cluster')
+@ApiExtraModels(WalletDebitAcceptedDto, WalletDebitRejectedDto)
 @Controller()
 export class CapController {
   constructor(private readonly cluster: ClusterService) {}
@@ -23,6 +32,7 @@ export class CapController {
     description: 'Returns side-by-side state for nodes A and B, plus whether a partition is active.',
   })
   @ApiResponse({ status: 200, type: NodesResponseDto })
+  @ApiServerError()
   nodes(): NodesResponseDto {
     return {
       partitioned: this.cluster.isPartitioned(),
@@ -36,7 +46,10 @@ export class CapController {
     description:
       'When enabled, nodes A and B stop syncing. AP endpoints accept local writes; CP wallet debits are rejected.',
   })
+  @ApiBody({ type: PartitionDto })
   @ApiResponse({ status: 201, type: PartitionResponseDto })
+  @ApiValidationErrors()
+  @ApiServerError()
   partition(@Body() body: PartitionDto): PartitionResponseDto {
     this.cluster.setPartitioned(body.enabled);
     return { partitioned: this.cluster.isPartitioned() };
@@ -50,6 +63,7 @@ export class CapController {
       'Node B may lag until reconciliation — showing 1,250 vs 1,251 views briefly is acceptable.',
   })
   @ApiResponse({ status: 201, type: ProductViewResponseDto })
+  @ApiServerError()
   viewProduct(): ProductViewResponseDto {
     return this.cluster.incrementProductViews();
   }
@@ -59,14 +73,21 @@ export class CapController {
     summary: 'Debit wallet balance (CP)',
     description:
       '**Consistency + Partition tolerance:** rejects writes during a partition to avoid divergent balances. ' +
-      'Also rejects when funds are insufficient.',
+      'Also rejects when funds are insufficient. Returns `accepted: true` with updated balance, or `accepted: false` with a reason.',
   })
-  @ApiResponse({ status: 201, description: 'Debit accepted.', type: WalletDebitAcceptedDto })
+  @ApiBody({ type: DebitDto })
   @ApiResponse({
     status: 201,
-    description: 'Debit rejected (partition or insufficient funds).',
-    type: WalletDebitRejectedDto,
+    description: 'Debit accepted or rejected (check `accepted` field).',
+    schema: {
+      oneOf: [
+        { $ref: getSchemaPath(WalletDebitAcceptedDto) },
+        { $ref: getSchemaPath(WalletDebitRejectedDto) },
+      ],
+    },
   })
+  @ApiValidationErrors()
+  @ApiServerError()
   debit(@Body() body: DebitDto) {
     return this.cluster.debitWallet(body.amount);
   }
@@ -77,6 +98,7 @@ export class CapController {
     description: 'Clears the partition flag and copies node A state to node B (eventual consistency catch-up).',
   })
   @ApiResponse({ status: 201, type: ReconcileResponseDto })
+  @ApiServerError()
   reconcile(): ReconcileResponseDto {
     return this.cluster.reconcile();
   }

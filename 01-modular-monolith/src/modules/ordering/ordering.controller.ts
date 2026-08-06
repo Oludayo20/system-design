@@ -1,15 +1,20 @@
 import { Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../shared/decorators/current-user.decorator';
+import {
+  ApiForbiddenError,
+  ApiNotFoundError,
+  ApiReadErrors,
+  ApiServerError,
+  ApiUnauthorizedError,
+  ApiValidationErrors,
+} from '../../shared/swagger/api-error.decorators';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../identity/identity.types';
 import { OrderResponseDto, PlaceOrderResponseDto } from './dto/order-response.dto';
@@ -32,8 +37,10 @@ export class OrderingController {
       'process asynchronously.',
   })
   @ApiResponse({ status: 201, description: 'Order placed.', type: PlaceOrderResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
-  @ApiForbiddenResponse({ description: 'Basket is empty.' })
+  @ApiValidationErrors()
+  @ApiUnauthorizedError()
+  @ApiForbiddenError('Basket is empty.')
+  @ApiServerError()
   placeOrder(@CurrentUser() user: AuthenticatedUser): Promise<PlaceOrderResult> {
     return this.orderingService.placeOrder(user.userId);
   }
@@ -41,7 +48,7 @@ export class OrderingController {
   @Get()
   @ApiOperation({ summary: 'List order history for the current user' })
   @ApiResponse({ status: 200, description: 'Orders newest first.', type: [OrderResponseDto] })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiReadErrors({ auth: true })
   listOrders(@CurrentUser() user: AuthenticatedUser): Promise<Order[]> {
     return this.orderingService.listOrders(user.userId);
   }
@@ -50,8 +57,8 @@ export class OrderingController {
   @ApiOperation({ summary: 'Get a single order by ID' })
   @ApiParam({ name: 'id', description: 'Order UUID', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Order with line items.', type: OrderResponseDto })
-  @ApiNotFoundResponse({ description: 'Order not found or not owned by this user.' })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiReadErrors({ auth: true })
+  @ApiNotFoundError('Order not found or not owned by this user.')
   getOrder(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -66,9 +73,11 @@ export class OrderingController {
   })
   @ApiParam({ name: 'id', description: 'Order UUID', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Cancelled order.', type: OrderResponseDto })
-  @ApiNotFoundResponse({ description: 'Order not found.' })
-  @ApiForbiddenResponse({ description: 'Order cannot be cancelled (wrong status or not owned).' })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiValidationErrors()
+  @ApiUnauthorizedError()
+  @ApiNotFoundError('Order not found.')
+  @ApiForbiddenError('Order cannot be cancelled (wrong status or not owned).')
+  @ApiServerError()
   cancelOrder(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,

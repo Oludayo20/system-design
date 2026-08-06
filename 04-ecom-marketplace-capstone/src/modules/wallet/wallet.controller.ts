@@ -1,5 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiServerError, ApiUnauthorizedError } from '../../common/swagger/api-error.decorators';
 import { WalletService } from './wallet.service';
 import { WalletMeResponseDto } from './dto/wallet-response.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -21,7 +22,8 @@ export class WalletController {
       'Order settlement debits arrive asynchronously via the Wallet worker.',
   })
   @ApiResponse({ status: 200, type: WalletMeResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiUnauthorizedError()
+  @ApiServerError()
   async me(@CurrentUser() user: JwtPayload) {
     const wallet = await this.walletService.getWallet(user.sub);
     const ledger = await this.walletService.getLedger(user.sub);

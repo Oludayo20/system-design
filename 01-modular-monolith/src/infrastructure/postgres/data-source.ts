@@ -2,7 +2,10 @@ import 'reflect-metadata';
 import { config } from 'dotenv';
 import { DataSource, DataSourceOptions } from 'typeorm';
 
-config();
+// Load .env for local CLI use only; Docker Compose injects env vars directly.
+if (process.env.NODE_ENV !== 'production') {
+  config();
+}
 
 /**
  * Standalone DataSource used only by the TypeORM CLI (migration:generate / migration:run).

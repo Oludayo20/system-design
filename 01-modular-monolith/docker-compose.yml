@@ -15,6 +15,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - eshop
 
   redis:
     image: redis:7-alpine
@@ -26,6 +28,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - eshop
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -41,6 +45,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    networks:
+      - eshop
 
   api:
     build:
@@ -50,6 +56,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Use Docker service names — not localhost from .env (which is for host-side dev).
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-eshop}
@@ -68,8 +75,34 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    command: >
-      sh -c "node ./node_modules/typeorm/cli.js migration:run -d dist/infrastructure/postgres/data-source.js && node dist/main.js"
+    restart: unless-stopped
+    networks:
+      - eshop
+    command:
+      - sh
+      - -c
+      - |
+        echo "Waiting for postgres DNS and TCP..."
+        i=0
+        until node -e "
+          const dns = require('dns');
+          const net = require('net');
+          dns.lookup('postgres', (err, addr) => {
+            if (err) process.exit(1);
+            const s = net.createConnection(5432, addr, () => { s.end(); process.exit(0); });
+            s.on('error', () => process.exit(1));
+          });
+        "; do
+          i=$$((i + 1))
+          if [ $$i -ge 60 ]; then echo "postgres not reachable after 60s"; exit 1; fi
+          sleep 1
+        done
+        node ./node_modules/typeorm/cli.js migration:run -d dist/infrastructure/postgres/data-source.js
+        exec node dist/main.js
+
+networks:
+  eshop:
+    driver: bridge
 
 volumes:
   postgres_data:

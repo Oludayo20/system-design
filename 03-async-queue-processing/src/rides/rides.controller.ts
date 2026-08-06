@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiServerError, ApiValidationErrors } from '../common/swagger/api-error.decorators';
 import { CompleteRideResponseDto } from './dto/complete-ride-response.dto';
 import { CreateRideDto } from './dto/create-ride.dto';
 import { CompleteRideResult, RidesService } from './rides.service';
@@ -20,11 +21,14 @@ export class RidesController {
       'in a different process — the rider never waits on those side effects.\n\n' +
       'See README for retry/DLQ topology on `email.queue`.',
   })
+  @ApiBody({ type: CreateRideDto })
   @ApiResponse({
     status: 201,
     description: 'Ride saved and event published. Workers process asynchronously.',
     type: CompleteRideResponseDto,
   })
+  @ApiValidationErrors()
+  @ApiServerError()
   async completeRide(@Body() dto: CreateRideDto): Promise<CompleteRideResult> {
     return this.ridesService.completeRide(dto);
   }

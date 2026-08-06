@@ -1,5 +1,6 @@
 import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiNotFoundError, ApiReadErrors } from '../../shared/swagger/api-error.decorators';
 import { CatalogService } from './catalog.service';
 import { ProductResponseDto } from './dto/product-response.dto';
 import { Product } from './entities/product.entity';
@@ -15,6 +16,7 @@ export class CatalogController {
     description: 'Returns every product in the catalog module. No caching on this list endpoint.',
   })
   @ApiResponse({ status: 200, description: 'Product catalog.', type: [ProductResponseDto] })
+  @ApiReadErrors()
   listProducts(): Promise<Product[]> {
     return this.catalogService.listProducts();
   }
@@ -28,7 +30,8 @@ export class CatalogController {
   })
   @ApiParam({ name: 'id', description: 'Product UUID', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Product found.', type: ProductResponseDto })
-  @ApiNotFoundResponse({ description: 'No product with this ID.' })
+  @ApiReadErrors()
+  @ApiNotFoundError('No product with this ID.')
   getProduct(@Param('id', ParseUUIDPipe) id: string): Promise<Product> {
     return this.catalogService.getProduct(id);
   }

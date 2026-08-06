@@ -10,14 +10,18 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiNotFoundResponse,
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiResponse,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../../shared/decorators/current-user.decorator';
+import {
+  ApiMutationErrors,
+  ApiNotFoundError,
+  ApiReadErrors,
+} from '../../shared/swagger/api-error.decorators';
 import { JwtAuthGuard } from '../identity/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../identity/identity.types';
 import { BasketView } from './basket.types';
@@ -38,7 +42,7 @@ export class BasketController {
     description: 'Returns cart line items with prices resolved via CatalogService (not direct SQL joins).',
   })
   @ApiResponse({ status: 200, description: 'Current basket.', type: BasketResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiReadErrors({ auth: true })
   getBasket(@CurrentUser() user: AuthenticatedUser): Promise<BasketView> {
     return this.basketService.getBasket(user.userId);
   }
@@ -48,9 +52,10 @@ export class BasketController {
     summary: 'Add a product to the basket',
     description: 'Resolves product name and price through CatalogService public API. Merges quantity if the product is already in the cart.',
   })
+  @ApiBody({ type: AddItemDto })
   @ApiResponse({ status: 201, description: 'Updated basket.', type: BasketResponseDto })
-  @ApiNotFoundResponse({ description: 'Product not found in catalog.' })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiMutationErrors({ auth: true })
+  @ApiNotFoundError('Product not found in catalog.')
   addItem(@CurrentUser() user: AuthenticatedUser, @Body() dto: AddItemDto): Promise<BasketView> {
     return this.basketService.addItem(user.userId, dto);
   }
@@ -59,7 +64,7 @@ export class BasketController {
   @ApiOperation({ summary: 'Remove a product from the basket' })
   @ApiParam({ name: 'productId', description: 'Product UUID to remove', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Updated basket.', type: BasketResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiReadErrors({ auth: true })
   removeItem(
     @CurrentUser() user: AuthenticatedUser,
     @Param('productId', ParseUUIDPipe) productId: string,

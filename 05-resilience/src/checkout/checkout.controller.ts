@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiServerError, ApiValidationErrors } from '../common/swagger/api-error.decorators';
 import { CheckoutService } from './checkout.service';
 import { CheckoutDto } from './dto/checkout.dto';
 import { CircuitStateResponseDto, PaymentResultDto } from './dto/checkout-response.dto';
@@ -20,7 +21,10 @@ export class CheckoutController {
       '4. If both fail → return `cached-fallback` with `status: queued`.\n\n' +
       'Tune `PAYMENT_FAILURE_RATE` in `.env` to simulate flaky Paystack.',
   })
+  @ApiBody({ type: CheckoutDto })
   @ApiResponse({ status: 201, description: 'Payment result from the winning provider.', type: PaymentResultDto })
+  @ApiValidationErrors()
+  @ApiServerError()
   pay(@Body() body: CheckoutDto) {
     return this.checkout.checkout(body.amount);
   }
@@ -31,6 +35,7 @@ export class CheckoutController {
     description: 'Returns `CLOSED` (normal), `OPEN` (rejecting calls), or `HALF_OPEN` (probe).',
   })
   @ApiResponse({ status: 200, type: CircuitStateResponseDto })
+  @ApiServerError()
   circuitState(): CircuitStateResponseDto {
     return { paystackCircuit: this.checkout.getCircuitState() };
   }

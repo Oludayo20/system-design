@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:-freshcart_password}
       POSTGRES_DB: ${ORDER_DB_NAME:-order_db}
     ports:
-      - '5432:5432'
+      - '5434:5432'
     volumes:
       - order_db_data:/var/lib/postgresql/data
     healthcheck:

@@ -1,0 +1,23 @@
+{
+  "name": "bookhive-notification-service",
+  "version": "1.0.0",
+  "description": "BookHive Notification Service - in-memory log of 'sent' notifications. No database. order-service calls this over HTTP, fire-and-forget, after every order.",
+  "private": true,
+  "license": "MIT",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "start:dev": "ts-node src/index.ts",
+    "test": "echo \"no unit tests for notification-service - see README Try it walkthrough\" && exit 0"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.17.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: orbit-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orbit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbit_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-orbit}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-orbit} -d ${POSTGRES_DB:-orbit}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - orbit
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: orbit-api
+    environment:
+      NODE_ENV: production
+      PORT: 3012
+      # Adapter selection — swap these without touching src/core (see README.md).
+      REPOSITORY: ${REPOSITORY:-postgres}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-stripe}
+      # Use Docker service names — not localhost from .env (which is for host-side dev/CLI).
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-orbit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orbit_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-orbit}
+    ports:
+      - '3012:3012'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - orbit
+    command:
+      - sh
+      - -c
+      - |
+        echo "Waiting for postgres DNS and TCP..."
+        i=0
+        until node -e "
+          const dns = require('dns');
+          const net = require('net');
+          dns.lookup('postgres', (err, addr) => {
+            if (err) process.exit(1);
+            const s = net.createConnection(5432, addr, () => { s.end(); process.exit(0); });
+            s.on('error', () => process.exit(1));
+          });
+        "; do
+          i=$$((i + 1))
+          if [ $$i -ge 60 ]; then echo "postgres not reachable after 60s"; exit 1; fi
+          sleep 1
+        done
+        if [ "$$REPOSITORY" = "postgres" ]; then
+          echo "Running migrations (REPOSITORY=postgres)..."
+          node ./node_modules/typeorm/cli.js migration:run -d dist/adapters/out/persistence/data-source.js
+        else
+          echo "REPOSITORY=$$REPOSITORY — skipping migrations."
+        fi
+        exec node dist/main.js
+
+networks:
+  orbit:
+    driver: bridge
+
+volumes:
+  postgres_data:

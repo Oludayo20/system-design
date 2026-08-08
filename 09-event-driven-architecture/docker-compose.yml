@@ -1,0 +1,149 @@
+services:
+  order-db:
+    image: postgres:16-alpine
+    container_name: freshcart-order-db
+    environment:
+      POSTGRES_USER: ${ORDER_DB_USER:-freshcart}
+      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:-freshcart_password}
+      POSTGRES_DB: ${ORDER_DB_NAME:-order_db}
+    ports:
+      - '5432:5432'
+    volumes:
+      - order_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${ORDER_DB_USER:-freshcart} -d ${ORDER_DB_NAME:-order_db}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Owned exclusively by inventory-consumer. order-api and the other consumers never touch it —
+  # each consumer that needs durable state owns its own database, the same way each consumer
+  # owns its own queue.
+  inventory-db:
+    image: postgres:16-alpine
+    container_name: freshcart-inventory-db
+    environment:
+      POSTGRES_USER: ${INVENTORY_DB_USER:-freshcart}
+      POSTGRES_PASSWORD: ${INVENTORY_DB_PASSWORD:-freshcart_password}
+      POSTGRES_DB: ${INVENTORY_DB_NAME:-inventory_db}
+    ports:
+      - '5433:5432'
+    volumes:
+      - inventory_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${INVENTORY_DB_USER:-freshcart} -d ${INVENTORY_DB_NAME:-inventory_db}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: freshcart-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-freshcart}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-freshcart_password}
+    ports:
+      - '5672:5672'
+      - '15672:15672' # management UI: http://localhost:15672
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # The only HTTP producer. POST /orders commits the order, then publishes order.placed and
+  # returns. Does not depend on, wait for, or know about any consumer below.
+  order-api:
+    build:
+      context: ./order-api
+      dockerfile: Dockerfile
+    container_name: freshcart-order-api
+    environment:
+      NODE_ENV: production
+      ORDER_API_PORT: 3009
+      ORDER_DB_HOST: order-db
+      ORDER_DB_PORT: 5432
+      ORDER_DB_USER: ${ORDER_DB_USER:-freshcart}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:-freshcart_password}
+      ORDER_DB_NAME: ${ORDER_DB_NAME:-order_db}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-freshcart}:${RABBITMQ_PASSWORD:-freshcart_password}@rabbitmq:5672
+    ports:
+      - '3009:3009'
+    depends_on:
+      order-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  inventory-consumer:
+    build:
+      context: ./inventory-consumer
+      dockerfile: Dockerfile
+    container_name: freshcart-inventory-consumer
+    environment:
+      NODE_ENV: production
+      INVENTORY_CONSUMER_PORT: 4101
+      INVENTORY_DB_HOST: inventory-db
+      INVENTORY_DB_PORT: 5432
+      INVENTORY_DB_USER: ${INVENTORY_DB_USER:-freshcart}
+      INVENTORY_DB_PASSWORD: ${INVENTORY_DB_PASSWORD:-freshcart_password}
+      INVENTORY_DB_NAME: ${INVENTORY_DB_NAME:-inventory_db}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-freshcart}:${RABBITMQ_PASSWORD:-freshcart_password}@rabbitmq:5672
+    ports:
+      - '4101:4101'
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notification-consumer:
+    build:
+      context: ./notification-consumer
+      dockerfile: Dockerfile
+    container_name: freshcart-notification-consumer
+    environment:
+      NODE_ENV: production
+      NOTIFICATION_CONSUMER_PORT: 4102
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-freshcart}:${RABBITMQ_PASSWORD:-freshcart_password}@rabbitmq:5672
+    ports:
+      - '4102:4102'
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  analytics-consumer:
+    build:
+      context: ./analytics-consumer
+      dockerfile: Dockerfile
+    container_name: freshcart-analytics-consumer
+    environment:
+      NODE_ENV: production
+      ANALYTICS_CONSUMER_PORT: 4103
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-freshcart}:${RABBITMQ_PASSWORD:-freshcart_password}@rabbitmq:5672
+    ports:
+      - '4103:4103'
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  # Added on day 2 — see README. Subscribes to the exact same order.placed event with zero
+  # changes anywhere above.
+  loyalty-consumer:
+    build:
+      context: ./loyalty-consumer
+      dockerfile: Dockerfile
+    container_name: freshcart-loyalty-consumer
+    environment:
+      NODE_ENV: production
+      LOYALTY_CONSUMER_PORT: 4104
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-freshcart}:${RABBITMQ_PASSWORD:-freshcart_password}@rabbitmq:5672
+    ports:
+      - '4104:4104'
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  order_db_data:
+  inventory_db_data:

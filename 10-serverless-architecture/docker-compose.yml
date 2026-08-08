@@ -1,0 +1,36 @@
+services:
+  # Backs the queue trigger only (simulates SQS -> Lambda). Own container, own host ports,
+  # not shared with the RabbitMQ instance in 03-async-queue-processing.
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: serverless-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-serverless_demo}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-serverless_demo_password}
+    ports:
+      - '5673:5672'
+      - '15673:15672' # management UI: http://localhost:15673
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: serverless-api
+    ports:
+      - '3010:3010'
+    environment:
+      NODE_ENV: production
+      PORT: 3010
+      WARM_TTL_MS: ${WARM_TTL_MS:-60000}
+      COLD_START_LATENCY_MS: ${COLD_START_LATENCY_MS:-400}
+      SCHEDULE_INTERVAL_MS: ${SCHEDULE_INTERVAL_MS:-30000}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-serverless_demo}:${RABBITMQ_PASSWORD:-serverless_demo_password}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped

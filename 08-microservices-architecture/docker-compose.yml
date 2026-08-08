@@ -1,0 +1,212 @@
+version: '3.9'
+
+services:
+  # ============================================================
+  # Gateway — the only service with a "public" host port anyone is meant
+  # to call. Routes /auth, /books, /orders, /notifications to the four
+  # services below, rate-limits per IP, and logs every request.
+  # ============================================================
+  gateway:
+    build: ./gateway
+    container_name: bookhive-gateway
+    environment:
+      PORT: 3008
+      AUTH_SERVICE_URL: http://auth-service:4001
+      CATALOG_SERVICE_URL: http://catalog-service:4002
+      ORDER_SERVICE_URL: http://order-service:4003
+      NOTIFICATION_SERVICE_URL: http://notification-service:4004
+      RATE_LIMIT_CAPACITY: ${RATE_LIMIT_CAPACITY:-20}
+      RATE_LIMIT_REFILL_PER_SEC: ${RATE_LIMIT_REFILL_PER_SEC:-10}
+    ports:
+      - '3008:3008'
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3008/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ============================================================
+  # Auth Service — register/login/verify. ONLY service with auth-db
+  # credentials.
+  # ============================================================
+  auth-service:
+    build: ./auth-service
+    container_name: bookhive-auth-service
+    environment:
+      PORT: 4001
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_please}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      AUTH_DB_HOST: auth-db
+      AUTH_DB_PORT: 5432
+      AUTH_DB_USER: ${AUTH_DB_USER:-bookhive}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-bookhive_dev_password}
+      AUTH_DB_NAME: ${AUTH_DB_NAME:-auth_db}
+    ports:
+      - '4001:4001'
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:4001/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  auth-db:
+    image: postgres:16-alpine
+    container_name: bookhive-auth-db
+    environment:
+      POSTGRES_USER: ${AUTH_DB_USER:-bookhive}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-bookhive_dev_password}
+      POSTGRES_DB: ${AUTH_DB_NAME:-auth_db}
+    ports:
+      - '${AUTH_DB_HOST_PORT:-5436}:5432'
+    volumes:
+      - bookhive_auth_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ============================================================
+  # Catalog Service — books + stock. ONLY service with catalog-db
+  # credentials. order-service never sees these.
+  # ============================================================
+  catalog-service:
+    build: ./catalog-service
+    container_name: bookhive-catalog-service
+    environment:
+      PORT: 4002
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_please}
+      CATALOG_DB_HOST: catalog-db
+      CATALOG_DB_PORT: 5432
+      CATALOG_DB_USER: ${CATALOG_DB_USER:-bookhive}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:-bookhive_dev_password}
+      CATALOG_DB_NAME: ${CATALOG_DB_NAME:-catalog_db}
+    ports:
+      - '4002:4002'
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:4002/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  catalog-db:
+    image: postgres:16-alpine
+    container_name: bookhive-catalog-db
+    environment:
+      POSTGRES_USER: ${CATALOG_DB_USER:-bookhive}
+      POSTGRES_PASSWORD: ${CATALOG_DB_PASSWORD:-bookhive_dev_password}
+      POSTGRES_DB: ${CATALOG_DB_NAME:-catalog_db}
+    ports:
+      - '${CATALOG_DB_HOST_PORT:-5437}:5432'
+    volumes:
+      - bookhive_catalog_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ============================================================
+  # Order Service — places orders. ONLY service with order-db credentials.
+  # Reaches the catalog exclusively over HTTP (CATALOG_SERVICE_URL) - it
+  # has no CATALOG_DB_* variable anywhere in its environment. Calls
+  # notification-service fire-and-forget with a short timeout so that
+  # service being down never fails an order (see README "Fault isolation").
+  # ============================================================
+  order-service:
+    build: ./order-service
+    container_name: bookhive-order-service
+    environment:
+      PORT: 4003
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_please}
+      ORDER_DB_HOST: order-db
+      ORDER_DB_PORT: 5432
+      ORDER_DB_USER: ${ORDER_DB_USER:-bookhive}
+      ORDER_DB_PASSWORD: ${ORDER_DB_PASSWORD:-bookhive_dev_password}
+      ORDER_DB_NAME: ${ORDER_DB_NAME:-order_db}
+      CATALOG_SERVICE_URL: http://catalog-service:4002
+      NOTIFICATION_SERVICE_URL: http://notification-service:4004
+      NOTIFICATION_TIMEOUT_MS: ${NOTIFICATION_TIMEOUT_MS:-2000}
+    ports:
+      - '4003:4003'
+    depends_on:
+      order-db:
+        condition: service_healthy
+      catalog-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:4003/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  order-db:
+    image: postgres:16-alpine
+    container_name: bookhive-order-db
+    environment:
+      POSTGRES_USER: ${ORDER_DB_USER:-bookhive}
+      POSTGRES_PASSWORD: ${ORDER_DB_PASSWORD:-bookhive_dev_password}
+      POSTGRES_DB: ${ORDER_DB_NAME:-order_db}
+    ports:
+      - '${ORDER_DB_HOST_PORT:-5438}:5432'
+    volumes:
+      - bookhive_order_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ============================================================
+  # Notification Service — in-memory log of "sent" notifications. No
+  # database at all: nothing here needs to survive a restart for the
+  # lesson to land. Stop this container at any time; order-service keeps
+  # taking orders (see README "Fault isolation").
+  # ============================================================
+  notification-service:
+    build: ./notification-service
+    container_name: bookhive-notification-service
+    environment:
+      PORT: 4004
+    ports:
+      - '4004:4004'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:4004/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  bookhive_auth_db_data:
+  bookhive_catalog_db_data:
+  bookhive_order_db_data:

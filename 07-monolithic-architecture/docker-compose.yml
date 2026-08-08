@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: blogstack-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-blogstack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blogstack_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-blogstack}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-blogstack} -d ${POSTGRES_DB:-blogstack}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - blogstack
+
+  # A monolith with only a database, on purpose: no Redis, no RabbitMQ, no event bus. One
+  # process, one shared PostgreSQL instance, modules call each other's services directly.
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blogstack-api
+    environment:
+      NODE_ENV: production
+      PORT: 3007
+      # Use the Docker service name — not localhost from .env (which is for host-side dev).
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-blogstack}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blogstack_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-blogstack}
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_please}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+    ports:
+      - '3007:3007'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - blogstack
+    command:
+      - sh
+      - -c
+      - |
+        echo "Waiting for postgres DNS and TCP..."
+        i=0
+        until node -e "
+          const dns = require('dns');
+          const net = require('net');
+          dns.lookup('postgres', (err, addr) => {
+            if (err) process.exit(1);
+            const s = net.createConnection(5432, addr, () => { s.end(); process.exit(0); });
+            s.on('error', () => process.exit(1));
+          });
+        "; do
+          i=$$((i + 1))
+          if [ $$i -ge 60 ]; then echo "postgres not reachable after 60s"; exit 1; fi
+          sleep 1
+        done
+        node ./node_modules/typeorm/cli.js migration:run -d dist/infrastructure/postgres/data-source.js
+        exec node dist/main.js
+
+networks:
+  blogstack:
+    driver: bridge
+
+volumes:
+  postgres_data:
